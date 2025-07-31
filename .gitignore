@@ -1,0 +1,47 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Logs
+logs/
+*.log
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Redis dump files
+dump.rdb
+*.rdb
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+DEMO_GUIDE.md
+DEMO.md
+DEPLOYMENT.md
+FIXES_SUMMARY.md
+PROJECT_STRUCTURE.md
+REDIS_WORKFLOW_GUIDE.md
+SUBMISSION.md
+DEVTO_ARTICLE.md
+ARTICLE_GUIDE.md
+*.sh
