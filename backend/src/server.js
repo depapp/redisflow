@@ -39,6 +39,21 @@ const io = new Server(httpServer, {
     transports: ['websocket', 'polling']
 });
 
+// Root endpoint
+app.get('/', (req, res) => {
+    res.json({
+        name: 'RedisFlow Backend API',
+        version: '1.0.0',
+        status: 'running',
+        endpoints: {
+            health: '/health',
+            workflows: '/api/workflows',
+            executions: '/api/executions',
+            stats: '/api/stats'
+        }
+    });
+});
+
 // Health check endpoint
 app.get('/health', async (req, res) => {
     try {
