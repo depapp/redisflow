@@ -6,7 +6,8 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 3000,
-    proxy: {
+    // Only use proxy in development
+    proxy: process.env.NODE_ENV === 'development' ? {
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true
@@ -16,6 +17,6 @@ export default defineConfig({
         ws: true,
         changeOrigin: true
       }
-    }
+    } : undefined
   }
 })
