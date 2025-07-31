@@ -11,7 +11,10 @@ const redisConfig = {
     socket: {
         host: process.env.REDIS_HOST || 'localhost',
         port: parseInt(process.env.REDIS_PORT || '6379'),
-        tls: process.env.REDIS_TLS === 'true' ? {} : undefined
+        tls: process.env.REDIS_TLS === 'true' ? {
+            rejectUnauthorized: false,
+            servername: process.env.REDIS_HOST
+        } : undefined
     }
 };
 
@@ -26,13 +29,12 @@ if (!process.env.REDIS_PASSWORD) {
 const redisClient = createClient(redisConfig);
 
 // Create ioredis client for advanced features (pub/sub, streams)
-const ioredisClient = new Redis({
+const ioredisConfig = {
     host: redisConfig.socket.host,
     port: redisConfig.socket.port,
     username: redisConfig.username,
     password: redisConfig.password,
     maxRetriesPerRequest: null, // Required for BullMQ
-    tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
     retryStrategy: (times) => {
         const maxRetries = parseInt(process.env.REDIS_MAX_RETRIES || '3');
         if (times > maxRetries) {
@@ -42,7 +44,17 @@ const ioredisClient = new Redis({
         const delay = Math.min(times * 50, 2000);
         return delay;
     }
-});
+};
+
+// Add TLS configuration for Redis Cloud
+if (process.env.REDIS_TLS === 'true') {
+    ioredisConfig.tls = {
+        rejectUnauthorized: false,
+        servername: redisConfig.socket.host
+    };
+}
+
+const ioredisClient = new Redis(ioredisConfig);
 
 // Error handling
 redisClient.on('error', (err) => {
