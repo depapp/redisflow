@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { ioredisClient, redisClient } = require('../../config/redis');
 const { v4: uuidv4 } = require('uuid');
+const { createWorkflowLimiter, validateWorkflowCreation } = require('../../middleware/security');
 
 // Get all workflows
 router.get('/', async (req, res) => {
@@ -99,8 +100,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create new workflow
-router.post('/', async (req, res) => {
+// Create new workflow (with rate limiting and validation)
+router.post('/', createWorkflowLimiter, validateWorkflowCreation, async (req, res) => {
     try {
         const { name, description, nodes = [], connections = [] } = req.body;
         

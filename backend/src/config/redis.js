@@ -50,8 +50,7 @@ const ioredisConfig = {
 // Add TLS configuration for Redis Cloud
 if (process.env.REDIS_TLS === 'true') {
     ioredisConfig.tls = {
-        rejectUnauthorized: false,
-        servername: redisConfig.socket.host
+        rejectUnauthorized: false
     };
 }
 

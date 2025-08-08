@@ -55,6 +55,16 @@ export const useWorkflowStore = defineStore('workflow', () => {
   }
 
   async function createWorkflow(workflowData) {
+    // Validate workflow data before sending to server
+    if (!workflowData.name || workflowData.name.trim() === '') {
+      throw new Error('Workflow name is required')
+    }
+    
+    // Prevent creating empty workflows with default name
+    if (workflowData.name === 'Workflow' && (!workflowData.nodes || workflowData.nodes.length === 0)) {
+      throw new Error('Cannot create empty workflow with default name')
+    }
+    
     loading.value = true
     error.value = null
     try {
@@ -62,8 +72,12 @@ export const useWorkflowStore = defineStore('workflow', () => {
       workflows.value.unshift(response.data)
       return response.data
     } catch (err) {
-      error.value = err.message
+      error.value = err.response?.data?.error || err.message
       console.error('Error creating workflow:', err)
+      // Re-throw with more specific error message
+      if (err.response?.data?.error) {
+        throw new Error(err.response.data.error)
+      }
       throw err
     } finally {
       loading.value = false

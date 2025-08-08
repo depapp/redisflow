@@ -10,6 +10,8 @@
     "redis:check": "node src/utils/redisHealthCheck.js check",
     "redis:cleanup": "node src/utils/redisHealthCheck.js cleanup",
     "redis:analyze": "node src/utils/redisHealthCheck.js analyze",
+    "redis:flush": "node src/utils/flushAll.js",
+    "analyze:requests": "node src/utils/analyzeRequests.js",
     "seed:demo": "node src/utils/seedDemoWorkflows.js",
     "seed:demo:force": "node src/utils/seedDemoWorkflows.js --force"
   },
@@ -28,6 +30,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.0.1",
     "ioredis": "^5.6.1",
     "redis": "^5.6.1",
     "socket.io": "^4.8.1",

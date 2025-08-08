@@ -8,6 +8,12 @@ const workflowRoutes = require('./api/routes/workflow');
 const executionRoutes = require('./api/routes/execution');
 const statsRoutes = require('./api/routes/stats');
 const { setupRealtimeHandlers } = require('./realtime/collaboration');
+const { 
+    apiLimiter, 
+    logRequest, 
+    blockBots, 
+    validateOrigin 
+} = require('./middleware/security');
 
 const app = express();
 const httpServer = createServer(app);
@@ -47,6 +53,13 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Security middleware
+app.set('trust proxy', 1); // Trust first proxy (needed for Railway/Vercel)
+app.use(logRequest); // Log all requests
+app.use(blockBots); // Block bot user agents from creating workflows
+app.use(validateOrigin); // Validate origin for mutations
+app.use('/api/', apiLimiter); // Apply rate limiting to all API routes
 
 // Socket.io setup
 const io = new Server(httpServer, {

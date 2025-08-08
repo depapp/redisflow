@@ -292,7 +292,7 @@ onMounted(async () => {
       router.push('/')
     }
   } else {
-    // Create new workflow
+    // Initialize new workflow (but don't save to database yet)
     workflow.value = {
       name: 'New Workflow',
       description: '',
@@ -300,6 +300,10 @@ onMounted(async () => {
       connections: []
     }
     workflowName.value = workflow.value.name
+    workflowDescription.value = workflow.value.description
+    
+    // Important: Don't create in database until user adds content
+    console.log('New workflow initialized (not saved to database)')
   }
 })
 
@@ -446,12 +450,19 @@ function handleNodeClick(nodeId) {
 }
 
 function goBack() {
+  // Check if there are unsaved changes for new workflows
+  if (isNewWorkflow.value && nodes.value.length > 0) {
+    if (!confirm('You have unsaved changes. Are you sure you want to leave?')) {
+      return
+    }
+  }
   router.push('/')
 }
 
 async function updateWorkflowName() {
   if (workflow.value && workflowName.value !== workflow.value.name) {
     workflow.value.name = workflowName.value
+    // Only auto-save for existing workflows, not new ones
     if (!isNewWorkflow.value) {
       await saveWorkflow()
     }
@@ -461,6 +472,7 @@ async function updateWorkflowName() {
 async function updateWorkflowDescription() {
   if (workflow.value && workflowDescription.value !== workflow.value.description) {
     workflow.value.description = workflowDescription.value
+    // Only auto-save for existing workflows, not new ones
     if (!isNewWorkflow.value) {
       await saveWorkflow()
     }
@@ -468,6 +480,25 @@ async function updateWorkflowDescription() {
 }
 
 async function saveWorkflow() {
+  // Validate before saving
+  if (isNewWorkflow.value) {
+    // Check if workflow has meaningful content
+    const hasContent = nodes.value.length > 0 || 
+                      (workflowName.value && workflowName.value !== 'New Workflow' && workflowName.value !== 'Workflow') ||
+                      (workflowDescription.value && workflowDescription.value.trim() !== '')
+    
+    if (!hasContent) {
+      alert('Please add some nodes or provide a custom name before saving the workflow')
+      return
+    }
+    
+    // Prevent saving empty workflows with default name
+    if (workflowName.value === 'Workflow' && nodes.value.length === 0) {
+      alert('Cannot save an empty workflow with default name. Please add nodes or change the workflow name.')
+      return
+    }
+  }
+  
   saving.value = true
   try {
     // Convert Vue Flow format back to workflow format
@@ -505,7 +536,12 @@ async function saveWorkflow() {
     }
   } catch (error) {
     console.error('Failed to save workflow:', error)
-    alert('Failed to save workflow')
+    // Show more detailed error message
+    if (error.response?.data?.error) {
+      alert(`Failed to save workflow: ${error.response.data.error}`)
+    } else {
+      alert('Failed to save workflow. Please check your connection and try again.')
+    }
   } finally {
     saving.value = false
   }
@@ -521,9 +557,19 @@ async function executeWorkflow() {
   executionResult.value = null
   
   try {
-    // Save workflow first if new
+    // Save workflow first if new (with validation)
     if (isNewWorkflow.value) {
+      // Must have nodes to execute
+      if (nodes.value.length === 0) {
+        alert('Cannot execute an empty workflow. Please add nodes first.')
+        return
+      }
       await saveWorkflow()
+      // Check if save was successful (workflow.value.id should exist)
+      if (!workflow.value?.id) {
+        alert('Please save the workflow before executing')
+        return
+      }
     }
     
     // Execute workflow
