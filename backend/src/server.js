@@ -2,7 +2,8 @@ const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const { connectRedis, ioredisClient } = require('./config/redis');
+const { connectRedis, ioredisClient, monitorRedisMemory } = require('./config/redis');
+const { features, isProduction } = require('./config/environment');
 const workflowRoutes = require('./api/routes/workflow');
 const executionRoutes = require('./api/routes/execution');
 const statsRoutes = require('./api/routes/stats');
@@ -72,16 +73,68 @@ app.get('/', (req, res) => {
 app.get('/health', async (req, res) => {
     try {
         const ping = await ioredisClient.ping();
+        
+        // Get memory info
+        const info = await ioredisClient.info('memory');
+        const usedMemory = parseInt(info.match(/used_memory:(\d+)/)?.[1] || 0);
+        const maxMemory = parseInt(info.match(/maxmemory:(\d+)/)?.[1] || 0);
+        const evictedKeys = parseInt(info.match(/evicted_keys:(\d+)/)?.[1] || 0);
+        
         res.json({
             status: 'healthy',
             redis: ping === 'PONG',
             timestamp: new Date().toISOString(),
-            connections: io.engine.clientsCount || 0
+            connections: io.engine.clientsCount || 0,
+            memory: {
+                used: usedMemory,
+                max: maxMemory,
+                usagePercent: maxMemory > 0 ? ((usedMemory / maxMemory) * 100).toFixed(2) : 0,
+                evictedKeys
+            },
+            environment: process.env.NODE_ENV || 'development'
         });
     } catch (error) {
         res.status(503).json({
             status: 'unhealthy',
             error: error.message
+        });
+    }
+});
+
+// Redis monitoring endpoint (protected)
+app.get('/api/redis/monitor', async (req, res) => {
+    try {
+        const info = await ioredisClient.info();
+        const dbSize = await ioredisClient.dbsize();
+        
+        // Parse memory info
+        const memoryInfo = {};
+        const memorySection = info.match(/# Memory\n([\s\S]*?)(?=\n# |$)/)?.[1] || '';
+        memorySection.split('\n').forEach(line => {
+            const [key, value] = line.split(':');
+            if (key && value) {
+                memoryInfo[key] = value.trim();
+            }
+        });
+        
+        // Get workflow statistics
+        const workflowKeys = await ioredisClient.keys('workflow:*');
+        const actualWorkflows = workflowKeys.filter(key => key.match(/^workflow:[a-f0-9-]+$/));
+        
+        res.json({
+            dbSize,
+            workflowCount: actualWorkflows.length,
+            memory: memoryInfo,
+            evictionWarning: parseInt(memoryInfo.evicted_keys || 0) > 0,
+            environment: {
+                nodeEnv: process.env.NODE_ENV,
+                features: features
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            error: 'Failed to get Redis monitoring data',
+            message: error.message
         });
     }
 });
@@ -110,6 +163,20 @@ async function startServer() {
     try {
         // Connect to Redis first
         await connectRedis();
+        
+        // Log environment configuration
+        console.log(`🔧 Configuration:`);
+        console.log(`   - Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`   - Demo Data: ${features.enableDemoData ? 'enabled' : 'disabled'}`);
+        console.log(`   - Auto Seed: ${features.enableAutoSeed ? 'enabled' : 'disabled'}`);
+        console.log(`   - Redis Monitoring: ${features.redisEvictionMonitoring ? 'enabled' : 'disabled'}`);
+        
+        // Set up periodic memory monitoring in production
+        if (isProduction && features.redisEvictionMonitoring) {
+            setInterval(async () => {
+                await monitorRedisMemory();
+            }, 60000); // Check every minute
+        }
         
         // Start HTTP server
         httpServer.listen(PORT, () => {

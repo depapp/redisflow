@@ -6,7 +6,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "redis:check": "node src/utils/redisHealthCheck.js check",
+    "redis:cleanup": "node src/utils/redisHealthCheck.js cleanup",
+    "redis:analyze": "node src/utils/redisHealthCheck.js analyze",
+    "seed:demo": "node src/utils/seedDemoWorkflows.js",
+    "seed:demo:force": "node src/utils/seedDemoWorkflows.js --force"
   },
   "keywords": [
     "redis",

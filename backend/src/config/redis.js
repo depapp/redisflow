@@ -1,5 +1,6 @@
 const { createClient } = require('redis');
 const Redis = require('ioredis');
+const { features, isProduction } = require('./environment');
 
 // Load environment variables
 require('dotenv').config();
@@ -81,6 +82,16 @@ async function connectRedis() {
         const evictionPolicy = config['maxmemory-policy'];
         if (evictionPolicy && evictionPolicy !== 'noeviction') {
             console.log(`⚠️  WARNING: Redis eviction policy is '${evictionPolicy}'. Consider setting it to 'noeviction' for production.`);
+            
+            // In production, this is critical
+            if (isProduction) {
+                console.error(`❌ CRITICAL: Production Redis has eviction policy '${evictionPolicy}' which may cause data loss!`);
+            }
+        }
+        
+        // Monitor memory usage if enabled
+        if (features.redisEvictionMonitoring) {
+            await monitorRedisMemory();
         }
     } catch (error) {
         console.error('❌ Failed to connect to Redis:', error);
@@ -88,10 +99,41 @@ async function connectRedis() {
     }
 }
 
+// Monitor Redis memory usage
+async function monitorRedisMemory() {
+    try {
+        const info = await ioredisClient.info('memory');
+        const usedMemory = parseInt(info.match(/used_memory:(\d+)/)?.[1] || 0);
+        const maxMemory = parseInt(info.match(/maxmemory:(\d+)/)?.[1] || 0);
+        
+        if (maxMemory > 0) {
+            const usagePercent = (usedMemory / maxMemory) * 100;
+            console.log(`📊 Redis Memory Usage: ${usagePercent.toFixed(2)}% (${(usedMemory / 1024 / 1024).toFixed(2)}MB / ${(maxMemory / 1024 / 1024).toFixed(2)}MB)`);
+            
+            if (usagePercent > 80) {
+                console.warn(`⚠️  WARNING: Redis memory usage is above 80%! This may cause evictions.`);
+            }
+            
+            if (usagePercent > 95) {
+                console.error(`❌ CRITICAL: Redis memory usage is above 95%! Data loss imminent!`);
+            }
+        }
+        
+        // Log eviction stats
+        const evictedKeys = parseInt(info.match(/evicted_keys:(\d+)/)?.[1] || 0);
+        if (evictedKeys > 0) {
+            console.error(`❌ ALERT: ${evictedKeys} keys have been evicted from Redis! This indicates memory pressure.`);
+        }
+    } catch (error) {
+        console.error('Error monitoring Redis memory:', error);
+    }
+}
+
 module.exports = {
     redisClient,
     ioredisClient,
     connectRedis,
+    monitorRedisMemory,
     // Export duplicates for pub/sub
     createPubSubClient: () => ioredisClient.duplicate(),
     createSubscriber: () => ioredisClient.duplicate()

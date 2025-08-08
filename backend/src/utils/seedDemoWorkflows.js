@@ -1,5 +1,6 @@
 const { ioredisClient } = require('../config/redis');
 const { v4: uuidv4 } = require('uuid');
+const { features, isProduction } = require('../config/environment');
 
 const demoWorkflows = [
   {
@@ -168,7 +169,28 @@ const demoWorkflows = [
   }
 ];
 
-async function seedDemoWorkflows() {
+async function seedDemoWorkflows(force = false) {
+  // Check if demo data is enabled
+  if (!features.enableDemoData && !force) {
+    console.log('ℹ️  Demo data is disabled in this environment');
+    return;
+  }
+  
+  // Never seed in production unless explicitly forced
+  if (isProduction && !force) {
+    console.log('⚠️  Skipping demo workflow seeding in production environment');
+    return;
+  }
+  
+  // Check if workflows already exist
+  const existingWorkflows = await ioredisClient.keys('workflow:*');
+  const actualWorkflows = existingWorkflows.filter(key => key.match(/^workflow:[a-f0-9-]+$/));
+  
+  if (actualWorkflows.length > 0 && !force) {
+    console.log(`ℹ️  Database already contains ${actualWorkflows.length} workflows. Skipping demo seeding.`);
+    return;
+  }
+  
   console.log('🌱 Seeding demo workflows...');
   
   for (const workflow of demoWorkflows) {
@@ -222,7 +244,14 @@ module.exports = { seedDemoWorkflows, demoWorkflows };
 
 // Run if called directly
 if (require.main === module) {
-  seedDemoWorkflows()
+  // Allow forcing via command line argument
+  const force = process.argv.includes('--force');
+  
+  if (force) {
+    console.log('⚠️  Force flag detected - will seed regardless of environment');
+  }
+  
+  seedDemoWorkflows(force)
     .then(() => process.exit(0))
     .catch(err => {
       console.error('Error seeding workflows:', err);
