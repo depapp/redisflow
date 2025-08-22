@@ -7,6 +7,9 @@
   <img src="https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white" />
 </div>
 
+## Full Explanation on DEV.to Article
+- https://dev.to/depapp/building-real-time-collaborative-workflows-with-12-redis-features-a51
+
 ## ✨ Key Features
 
 ### 1. Visual Workflow Builder
